@@ -27,10 +27,13 @@ def create_response_header(protocol, response_size):
 
 def process_request(data, conn):
     verb, uri, protocol = [token.strip() for token in data.splitlines()[0].split(' ')]
-    if verb == 'GET' and uri == '/':
-        response_filename = 'index.html'
-        content_length = os.path.getsize(response_filename)
-        with open(response_filename, 'r') as response_file:
+    if verb == 'GET':
+        uri = uri[1:]
+        if not uri:
+            uri = 'index.html'
+        uri_path = os.path.join(os.getcwd(), uri)
+        content_length = os.path.getsize(uri_path)
+        with open(uri_path, 'r') as response_file:
             response = create_response_header(protocol, content_length) + \
                 '\n\n' + response_file.read()
         conn.send(response)
