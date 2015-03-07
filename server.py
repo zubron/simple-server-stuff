@@ -1,5 +1,6 @@
 import os
 import socket
+import sys
 
 from wsgiref.handlers import format_date_time
 from datetime import datetime
@@ -15,8 +16,8 @@ def current_date_time():
     return format_date_time(timestamp)
 
 
-def create_response_header(protocol, response_size):
-    return protocol + ' 200 OK' + '\n' + \
+def create_response_header(protocol, response_code, response_size):
+    return protocol + ' ' + response_code + '\n' + \
         'Date: ' + current_date_time() + '\n' + \
         'Connection: close' + '\n' + \
         'Server: simple-server' + '\n' + \
@@ -26,16 +27,23 @@ def create_response_header(protocol, response_size):
 
 
 def process_request(data, conn):
-    verb, uri, protocol = [token.strip() for token in data.splitlines()[0].split(' ')]
+    verb, req_uri, protocol = [token.strip() for token in data.splitlines()[0].split(' ')]
     if verb == 'GET':
-        uri = uri[1:]
+        uri = req_uri[1:]
         if not uri:
             uri = 'index.html'
         uri_path = os.path.join(os.getcwd(), uri)
-        content_length = os.path.getsize(uri_path)
-        with open(uri_path, 'r') as response_file:
-            response = create_response_header(protocol, content_length) + \
-                '\n\n' + response_file.read()
+        if os.path.exists(uri_path):
+            content_length = os.path.getsize(uri_path)
+            with open(uri_path, 'r') as response_file:
+                response = create_response_header(protocol, '200 OK', content_length) + \
+                    '\n\n' + response_file.read()
+        else:
+            # Construct 404 response
+            response_str = "Cannot GET " + req_uri
+            content_length = sys.getsizeof(response_str)
+            response = create_response_header(protocol, '404 Not Found', content_length) + \
+                '\n\n' + response_str
         conn.send(response)
     else:
         conn.send(data)
