@@ -19,7 +19,7 @@ def current_date_time():
 def create_response_header(protocol, response_code, response_size):
     return protocol + ' ' + response_code + '\n' + \
         'Date: ' + current_date_time() + '\n' + \
-        'Connection: close' + '\n' + \
+        'Connection: keep-alive' + '\n' + \
         'Server: simple-server' + '\n' + \
         'Accept-Ranges: bytes' + '\n' + \
         'Content-Type: text/html; charset=UTF-8' + '\n' + \
@@ -40,8 +40,8 @@ def process_request(data, conn):
                     '\n\n' + response_file.read()
         else:
             # Construct 404 response
-            response_str = "Cannot GET " + req_uri
-            content_length = sys.getsizeof(response_str)
+            response_str = 'Cannot GET ' + req_uri
+            content_length = len(response_str)
             response = create_response_header(protocol, '404 Not Found', content_length) + \
                 '\n\n' + response_str
         conn.send(response)
