@@ -6,10 +6,6 @@ from wsgiref.handlers import format_date_time
 from datetime import datetime
 from time import mktime
 
-ip = '127.0.0.1'
-port = 5005
-buf_size = 1024
-
 
 def current_date_time():
     timestamp = mktime(datetime.now().timetuple())
@@ -49,22 +45,32 @@ def process_request(data, conn):
         conn.send(data)
 
 
-def run_server():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((ip, port))
-    s.listen(1)
+class Server:
+    ''' Server '''
 
-    conn, addr = s.accept()
-    print 'Connection address:', addr
-    while True:
-        data = conn.recv(buf_size)
-        if not data:
-            break
-        print 'Received data from client: ', data
-        process_request(data, conn)
-    conn.close()
+    def __init__(self):
+        self.ip = '127.0.0.1'
+        self.port = 5005
+        self.buf_size = 1024
+
+
+    def start(self):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.bind((self.ip, self.port))
+        self.socket.listen(1)
+
+        conn, addr = self.socket.accept()
+        print 'Connection address:', addr
+        while True:
+            data = conn.recv(self.buf_size)
+            if not data:
+                break
+            print 'Received data from client: ', data
+            process_request(data, conn)
+        conn.close()
 
 
 if __name__ == '__main__':
-    run_server()
+    server = Server()
+    server.start()
 
