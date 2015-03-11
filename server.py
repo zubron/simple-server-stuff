@@ -1,4 +1,5 @@
 import os
+import signal
 import socket
 import sys
 
@@ -56,21 +57,27 @@ class Server:
 
     def start(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind((self.ip, self.port))
         self.socket.listen(1)
 
-        conn, addr = self.socket.accept()
-        print 'Connection address:', addr
         while True:
-            data = conn.recv(self.buf_size)
+            client, addr = self.socket.accept()
+            print 'Connection address:', addr
+            data = client.recv(self.buf_size)
             if not data:
                 break
             print 'Received data from client: ', data
-            process_request(data, conn)
-        conn.close()
+            process_request(data, client)
+            client.close()
+
+    def stop(self, signal, handler):
+        self.socket.shutdown(socket.SHUT_RDWR)
+        sys.exit(0)
 
 
 if __name__ == '__main__':
     server = Server()
+    signal.signal(signal.SIGINT, server.stop)
     server.start()
 
