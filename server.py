@@ -24,7 +24,13 @@ def create_response_header(protocol, response_code, response_size):
 
 
 def process_request(data, conn):
-    verb, req_uri, protocol = [token.strip() for token in data.splitlines()[0].split(' ')]
+    try:
+        verb, req_uri, protocol = [token.strip() for token in data.splitlines()[0].split(' ')]
+    except ValueError:
+        print 'Invalid HTTP request: ', data
+        conn.send(data)
+        return
+
     if verb == 'GET':
         uri = req_uri[1:]
         if not uri:
