@@ -60,13 +60,14 @@ class Server:
         self.port = 5005
         self.buf_size = 1024
 
-
     def start(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind((self.ip, self.port))
         self.socket.listen(1)
+        self._await_requests()
 
+    def _await_requests(self):
         while True:
             client, addr = self.socket.accept()
             print 'Connection address:', addr
