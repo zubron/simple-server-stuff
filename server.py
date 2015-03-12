@@ -1,3 +1,4 @@
+import asyncore
 import os
 import signal
 import socket
@@ -13,73 +14,74 @@ def current_date_time():
     return format_date_time(timestamp)
 
 
-def create_response_header(protocol, response_code, response_size):
-    return protocol + ' ' + response_code + '\n' + \
-        'Date: ' + current_date_time() + '\n' + \
-        'Connection: keep-alive' + '\n' + \
-        'Server: simple-server' + '\n' + \
-        'Accept-Ranges: bytes' + '\n' + \
-        'Content-Type: text/html; charset=UTF-8' + '\n' + \
-        'Content-Length: ' + str(response_size) + '\n'
+class HTTPHandler(asyncore.dispatcher_with_send):
+    def handle_read(self):
+        data = self.recv(1024)
+        if data:
+            response = self._process_request(data)
+            self.send(response)
 
+    def _create_response_header(self, protocol, response_code, content_length):
+        return protocol + ' ' + response_code + '\n' + \
+            'Date: ' + current_date_time() + '\n' + \
+            'Connection: keep-alive' + '\n' + \
+            'Server: simple-server' + '\n' + \
+            'Accept-Ranges: bytes' + '\n' + \
+            'Content-Type: text/html; charset=UTF-8' + '\n' + \
+            'Content-Length: ' + str(content_length) + '\n'
 
-def process_request(data, conn):
-    try:
-        verb, req_uri, protocol = [token.strip() for token in data.splitlines()[0].split(' ')]
-    except ValueError:
-        print 'Invalid HTTP request: ', data
-        conn.send(data)
-        return
+    def _process_request(self, data):
+        try:
+            verb, req_uri, protocol = [token.strip() for token in data.splitlines()[0].split(' ')]
+        except ValueError:
+            print 'Invalid HTTP request: ', data
+            return data
 
-    if verb == 'GET':
-        uri = req_uri[1:]
-        if not uri:
-            uri = 'index.html'
-        uri_path = os.path.join(os.getcwd(), uri)
-        if os.path.exists(uri_path):
-            content_length = os.path.getsize(uri_path)
-            with open(uri_path, 'r') as response_file:
-                response = create_response_header(protocol, '200 OK', content_length) + \
-                    '\n\n' + response_file.read()
+        if verb == 'GET':
+            uri = req_uri[1:]
+            if not uri:
+                uri = 'index.html'
+            uri_path = os.path.join(os.getcwd(), uri)
+            if os.path.exists(uri_path):
+                content_length = os.path.getsize(uri_path)
+                with open(uri_path, 'r') as response_file:
+                    response = self._create_response_header(protocol, '200 OK', content_length) + \
+                        '\n\n' + response_file.read()
+            else:
+                # Construct 404 response
+                response_str = 'Cannot GET %s' % req_uri
+                content_length = len(response_str) + 1
+                response = self._create_response_header(protocol, '404 Not Found', content_length) + \
+                    '\n\n' + response_str
+            return response
         else:
-            # Construct 404 response
-            response_str = 'Cannot GET ' + req_uri
-            content_length = len(response_str)
-            response = create_response_header(protocol, '404 Not Found', content_length) + \
-                '\n\n' + response_str
-        conn.send(response)
-    else:
-        conn.send(data)
+            return data
 
 
-class Server:
+class Server(asyncore.dispatcher):
     ''' Server '''
 
     def __init__(self):
+        asyncore.dispatcher.__init__(self)
         self.ip = '127.0.0.1'
         self.port = 5005
-        self.buf_size = 1024
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.set_reuse_addr()
+        self.bind((self.ip, self.port))
+        self.listen(5)
 
     def start(self):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.socket.bind((self.ip, self.port))
-        self.socket.listen(1)
-        self._await_requests()
+        asyncore.loop()
 
-    def _await_requests(self):
-        while True:
-            client, addr = self.socket.accept()
-            print 'Connection address:', addr
-            data = client.recv(self.buf_size)
-            if not data:
-                break
-            print 'Received data from client: ', data
-            process_request(data, client)
-            client.close()
+    def handle_accept(self):
+        pair = self.accept()
+        if pair is not None:
+            client, addr = pair
+            print 'Incoming connection from %s' % repr(addr)
+            handler = HTTPHandler(client)
 
     def stop(self, signal, handler):
-        self.socket.shutdown(socket.SHUT_RDWR)
+        self.close()
         sys.exit(0)
 
 
