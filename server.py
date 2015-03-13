@@ -1,3 +1,4 @@
+import argparse
 import asyncore
 import mimetypes
 import os
@@ -65,13 +66,13 @@ class HTTPHandler(asyncore.dispatcher_with_send):
 class Server(asyncore.dispatcher):
     ''' Server '''
 
-    def __init__(self):
+    def __init__(self, hostname = 'localhost', port = 8000):
         asyncore.dispatcher.__init__(self)
-        self.ip = '127.0.0.1'
-        self.port = 5005
+        self.hostname = hostname
+        self.port = port
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.set_reuse_addr()
-        self.bind((self.ip, self.port))
+        self.bind((self.hostname, self.port))
         self.listen(5)
 
     def start(self):
@@ -89,8 +90,18 @@ class Server(asyncore.dispatcher):
         sys.exit(0)
 
 
+def parse_commandline():
+    parser = argparse.ArgumentParser(description='An even simpler HTTP server', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-p', '--port', type=int, help='Specify which port to accept connections on')
+    parser.add_argument('-n', '--hostname', type=str, help='Specify which hostname to use')
+    parser.set_defaults(hostname = 'localhost', port = 8000)
+    arguments = parser.parse_args()
+    return arguments.hostname, arguments.port
+
+
 if __name__ == '__main__':
-    server = Server()
+    hostname, port = parse_commandline()
+    server = Server(hostname, port)
     signal.signal(signal.SIGINT, server.stop)
     server.start()
 
