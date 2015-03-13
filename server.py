@@ -1,4 +1,5 @@
 import asyncore
+import mimetypes
 import os
 import signal
 import socket
@@ -21,14 +22,14 @@ class HTTPHandler(asyncore.dispatcher_with_send):
             response = self._process_request(data)
             self.send(response)
 
-    def _create_response_header(self, protocol, response_code, content_length):
+    def _create_response_header(self, protocol, response_code, content_type, content_length):
         return protocol + ' ' + response_code + '\n' + \
             'Date: ' + current_date_time() + '\n' + \
             'Connection: keep-alive' + '\n' + \
             'Server: simple-server' + '\n' + \
             'Accept-Ranges: bytes' + '\n' + \
-            'Content-Type: text/html; charset=UTF-8' + '\n' + \
-            'Content-Length: ' + str(content_length) + '\n'
+            'Content-Type: ' + content_type + '\n' + \
+            'Content-Length: ' + str(content_length)
 
     def _process_request(self, data):
         try:
@@ -44,14 +45,17 @@ class HTTPHandler(asyncore.dispatcher_with_send):
             uri_path = os.path.join(os.getcwd(), uri)
             if os.path.exists(uri_path):
                 content_length = os.path.getsize(uri_path)
-                with open(uri_path, 'r') as response_file:
-                    response = self._create_response_header(protocol, '200 OK', content_length) + \
+                with open(uri_path, 'rb') as response_file:
+                    _, extension = os.path.splitext(uri_path)
+                    content_type = mimetypes.types_map[extension]
+                    response = self._create_response_header(protocol, '200 OK', content_type, content_length) + \
                         '\n\n' + response_file.read()
             else:
                 # Construct 404 response
                 response_str = 'Cannot GET %s' % req_uri
-                content_length = len(response_str) + 1
-                response = self._create_response_header(protocol, '404 Not Found', content_length) + \
+                content_length = len(response_str)
+                content_type = mimetypes.types_map['.txt']
+                response = self._create_response_header(protocol, '404 Not Found', content_type, content_length) + \
                     '\n\n' + response_str
             return response
         else:
